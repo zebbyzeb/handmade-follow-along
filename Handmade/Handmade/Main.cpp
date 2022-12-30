@@ -10,10 +10,10 @@ LRESULT MainWindowCallback(HWND window,
 {
 	LRESULT result = 0;
 
+	OutputDebugStringA(("Event:" + std::to_string(message) + "\n").c_str());
+
 	switch (message)
 	{
-		OutputDebugStringA(("Event:" + std::to_string(message)).c_str());
-
 		case WM_SIZE: {
 			break;
 		}
@@ -78,12 +78,20 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 		if (windowHandle) {
 			// Need to start a message queue that Windows pushes messages to for our window
 			// which we then need to pull.
-			MSG message;
-			MSG* pMessage = &message;
-			GetMessage(pMessage,
-					   0,
-					   0,
-					   0);
+			bool Running = true;
+			while (Running)
+			{
+				MSG message;
+				MSG* pMessage = &message;
+				BOOL messageResult = GetMessage(pMessage,
+												0,
+												0,
+												0);
+				if (messageResult > 0) {
+					TranslateMessage(pMessage);
+					DispatchMessageW(pMessage);
+				}
+			}
 		}
 		else {
 
