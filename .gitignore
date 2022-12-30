@@ -1,2 +1,4 @@
 Handmade/.vs/*
 **/Debug/*
+**/*.exe
+**/*.pdb

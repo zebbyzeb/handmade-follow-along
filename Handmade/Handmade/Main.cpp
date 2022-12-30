@@ -10,27 +10,57 @@ LRESULT MainWindowCallback(HWND window,
 {
 	LRESULT result = 0;
 
-	OutputDebugStringA(("Event:" + std::to_string(message) + "\n").c_str());
-
 	switch (message)
 	{
 		case WM_SIZE: {
+			OutputDebugStringA(("Event: WM_SIZE: " + std::to_string(message) + "\n").c_str());
 			break;
 		}
 
 		case WM_DESTROY: {
+			OutputDebugStringA(("Event: WM_DESTROY: " + std::to_string(message) + "\n").c_str());
 			break;
 		}
 
 		case WM_CLOSE: {
+			OutputDebugStringA(("Event: WM_CLOSE: " + std::to_string(message) + "\n").c_str());
 			break;
 		}
 
 		case WM_ACTIVATEAPP: {
+			OutputDebugStringA(("Event: WM_ACTIVATEAPP: " + std::to_string(message) + "\n").c_str());
+			break;
+		}
+
+		case WM_PAINT: {
+			OutputDebugStringA(("Event: WM_PAINT: " + std::to_string(message) + "\n").c_str());
+
+			PAINTSTRUCT paintStruct;
+			LPPAINTSTRUCT pPaintStruct = &paintStruct;
+
+			HDC deviceContext = BeginPaint(window, pPaintStruct);
+			
+			int width = paintStruct.rcPaint.right - paintStruct.rcPaint.left;
+			int height = paintStruct.rcPaint.bottom - paintStruct.rcPaint.top;
+
+			static DWORD rasterOperation = BLACKNESS;
+			rasterOperation = rasterOperation == WHITENESS ? BLACKNESS : WHITENESS;
+
+			PatBlt(deviceContext,
+				paintStruct.rcPaint.left,
+				paintStruct.rcPaint.top,
+				width,
+				height,
+				rasterOperation);
+
+			EndPaint(window, pPaintStruct);
+
 			break;
 		}
 
 		default: {
+			OutputDebugStringA(("Event: " + std::to_string(message) + "\n").c_str());
+
 			// Default window procedure to let windows handle the events that we dont want to handle.
 			result = DefWindowProc(window, message, wParam, lParam);
 			break;
