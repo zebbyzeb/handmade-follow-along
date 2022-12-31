@@ -2,6 +2,32 @@
 #include <string>
 #include "Constants.h"
 
+static bool Running;
+
+// Create Bitmap buffer
+static void ResizeDIBSection(int width, int height) {
+	HBITMAP CreateDIBSection(
+		[in]  HDC              hdc,
+		[in]  const BITMAPINFO * pbmi,
+		[in]  UINT             usage,
+		[out] VOID * *ppvBits,
+		[in]  HANDLE           hSection,
+		[in]  DWORD            offset
+	);
+}
+
+static void UpdateWindow(HDC deviceContext, int x, int y, int width, int height) {
+	StretchDIBits(deviceContext,
+						x, y, width, height, // destination
+						x, y, width, height, // source
+		[in] const VOID * lpBits,
+		[in] const BITMAPINFO * lpbmi,
+						DIB_RGB_COLORS,
+						SRCCOPY
+	);
+}
+
+
 // Callback method that windows calls for our application to handle messages sent to the WNDCLASS window.
 LRESULT MainWindowCallback(HWND window,
 							UINT message,
@@ -14,16 +40,36 @@ LRESULT MainWindowCallback(HWND window,
 	{
 		case WM_SIZE: {
 			OutputDebugStringA(("Event: WM_SIZE: " + std::to_string(message) + "\n").c_str());
+
+			RECT clientRect;
+			RECT* pClientRect = &clientRect;
+			// Drawable rectangle.
+			GetClientRect(window, pClientRect);
+			long width = clientRect.right - clientRect.left;
+			long height = clientRect.bottom - clientRect.top;
+
+			// Re-render bitmap everytime the window is resized.
+			ResizeDIBSection(width, height);
+
 			break;
 		}
 
 		case WM_DESTROY: {
 			OutputDebugStringA(("Event: WM_DESTROY: " + std::to_string(message) + "\n").c_str());
+
+			DestroyWindow(window); // Destroys the window altogether.
 			break;
 		}
 
 		case WM_CLOSE: {
 			OutputDebugStringA(("Event: WM_CLOSE: " + std::to_string(message) + "\n").c_str());
+
+			// Post a Quit message to the queue which really is the int we pass with PostQuitMessage.
+			//PostQuitMessage(0);
+
+			// Can display a message before toggling the flag.
+			Running = false;
+
 			break;
 		}
 
@@ -43,7 +89,7 @@ LRESULT MainWindowCallback(HWND window,
 			int width = paintStruct.rcPaint.right - paintStruct.rcPaint.left;
 			int height = paintStruct.rcPaint.bottom - paintStruct.rcPaint.top;
 
-			static DWORD rasterOperation = BLACKNESS;
+			static DWORD rasterOperation = BLACKNESS; // What is a rater operation ?
 			rasterOperation = rasterOperation == WHITENESS ? BLACKNESS : WHITENESS;
 
 			PatBlt(deviceContext,
@@ -108,7 +154,7 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 		if (windowHandle) {
 			// Need to start a message queue that Windows pushes messages to for our window
 			// which we then need to pull.
-			bool Running = true;
+			Running = true;
 			while (Running)
 			{
 				MSG message;
@@ -118,8 +164,12 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 												0,
 												0);
 				if (messageResult > 0) {
-					TranslateMessage(pMessage);
-					DispatchMessageW(pMessage);
+					TranslateMessage(pMessage); // If this is commented out we cant resize the window or capture window Close events.
+					DispatchMessageW(pMessage); // If this is commented out we still see callback procedure getting invoked.
+				}
+				else {
+					// PostQuitMessage(0) posted a 0 message to the queue which we can handle by toggling the Running flag.
+					Running = false;
 				}
 			}
 		}
