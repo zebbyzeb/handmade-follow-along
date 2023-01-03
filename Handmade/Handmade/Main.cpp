@@ -3,25 +3,44 @@
 #include "Constants.h"
 
 static bool Running;
+static BITMAPINFO bitmapInfo;
+static BITMAPINFO* pBitmapInfo = &bitmapInfo;
+static void* pBitmapMemory;
+static HBITMAP bitmapHandle;
+static HDC bitmapDeviceContext;
 
 // Create Bitmap buffer
 static void ResizeDIBSection(int width, int height) {
-	HBITMAP CreateDIBSection(
-		[in]  HDC              hdc,
-		[in]  const BITMAPINFO * pbmi,
-		[in]  UINT             usage,
-		[out] VOID * *ppvBits,
-		[in]  HANDLE           hSection,
-		[in]  DWORD            offset
-	);
+
+	if (bitmapHandle) {
+		DeleteObject(bitmapHandle);
+	}
+	if (!bitmapDeviceContext) {
+		bitmapDeviceContext = CreateCompatibleDC(0);
+	}
+	
+	bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
+	bitmapInfo.bmiHeader.biWidth = width;
+	bitmapInfo.bmiHeader.biHeight = height;
+	bitmapInfo.bmiHeader.biPlanes = 1;
+	bitmapInfo.bmiHeader.biBitCount = 32; // Only need 24 bits: 8 bit for R, G, B. Specifying 32 for DWORD alignment.
+	bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+	void** ppBitmapMemory = &pBitmapMemory;
+	bitmapHandle =  CreateDIBSection(bitmapDeviceContext,
+									pBitmapInfo,
+									DIB_RGB_COLORS,
+									ppBitmapMemory,
+									0,
+									0);
 }
 
 static void UpdateWindow(HDC deviceContext, int x, int y, int width, int height) {
 	StretchDIBits(deviceContext,
 						x, y, width, height, // destination
 						x, y, width, height, // source
-		[in] const VOID * lpBits,
-		[in] const BITMAPINFO * lpbmi,
+						pBitmapMemory,
+						pBitmapInfo,
 						DIB_RGB_COLORS,
 						SRCCOPY
 	);
