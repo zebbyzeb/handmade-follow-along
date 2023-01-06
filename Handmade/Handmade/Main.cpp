@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <stdint.h>
 #include <string>
 #include "Constants.h"
 
@@ -6,39 +7,118 @@ static bool Running;
 static BITMAPINFO bitmapInfo;
 static BITMAPINFO* pBitmapInfo = &bitmapInfo;
 static void* pBitmapMemory;
-static HBITMAP bitmapHandle;
-static HDC bitmapDeviceContext;
+
+static int bitmapWidth;
+static int bitmapHeight;
+
+static int bytesPerPixel = 4;
+
+static void FillBitmapMemory(int xOffset, int yOffset) {
+
+	uint8_t* row = (uint8_t*)pBitmapMemory;
+	int pitch = bitmapWidth * bytesPerPixel;
+
+	for (int y = 0; y < bitmapHeight; ++y) {
+
+		//uint8_t* pixel = (uint8_t*)row;
+		uint32_t* pixel = (uint32_t*)row;
+
+		for (int x = 0; x < bitmapWidth; ++x) {
+
+			/* Little Endian Architecture :
+			0x 00 00 00 00
+			0x 00 GG BB RR
+
+			Windows devs made it so that they can visualise RGB when they looked into the Registers:
+			0x 00 00 00 00
+			0x 00 RR GG BB
+			*/
+			uint8_t blue = x + xOffset;
+			uint8_t green = y + yOffset;
+
+			*pixel = green << 8 | blue; // Filling 32 bits at a time instead of 8 bits.
+			++pixel;
+
+			/*
+			Loading In Memory:		BB GG RR xx
+			Loading In Register:	xx RR GG BB				Because Little Endian Architecture.
+			*/
+
+			/*
+			*pixel = x + xOffset;
+			++pixel;
+
+			*pixel = y + yOffset;
+			++pixel;
+
+			*pixel = 0;
+			++pixel;
+
+			*pixel = 0;
+			++pixel;*/
+		}
+
+		row += pitch;
+	}	
+}
+
+// TODO: Research why for some reason we dont need to CreateCompatibleDC and CreateDIBSection.
+//static HBITMAP bitmapHandle;
+//static HDC bitmapDeviceContext;
 
 // Create Bitmap buffer
 static void ResizeDIBSection(int width, int height) {
 
-	if (bitmapHandle) {
-		DeleteObject(bitmapHandle);
+	//if (bitmapHandle) {
+	//	DeleteObject(bitmapHandle);
+	//}
+	//if (!bitmapDeviceContext) {
+	//	bitmapDeviceContext = CreateCompatibleDC(0);
+	//}
+	
+
+	// Make sure the memory is freed before we reallocate memory on resize.
+	// TODO: Read about VirtualProtect to catch 'memory write after free' bugs.
+	if (pBitmapMemory) {
+		VirtualFree(pBitmapMemory, 0, MEM_RELEASE);
 	}
-	if (!bitmapDeviceContext) {
-		bitmapDeviceContext = CreateCompatibleDC(0);
-	}
+
+	bitmapWidth = width;
+	bitmapHeight = height;
 	
 	bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
-	bitmapInfo.bmiHeader.biWidth = width;
-	bitmapInfo.bmiHeader.biHeight = height;
+	bitmapInfo.bmiHeader.biWidth = bitmapWidth;
+	bitmapInfo.bmiHeader.biHeight = -bitmapHeight; // negative so that the bitmap on screen goes top-down
 	bitmapInfo.bmiHeader.biPlanes = 1;
 	bitmapInfo.bmiHeader.biBitCount = 32; // Only need 24 bits: 8 bit for R, G, B. Specifying 32 for DWORD alignment.
 	bitmapInfo.bmiHeader.biCompression = BI_RGB;
 
 	void** ppBitmapMemory = &pBitmapMemory;
-	bitmapHandle =  CreateDIBSection(bitmapDeviceContext,
+	/*bitmapHandle =  CreateDIBSection(bitmapDeviceContext,
 									pBitmapInfo,
 									DIB_RGB_COLORS,
 									ppBitmapMemory,
 									0,
-									0);
+									0);*/
+
+	int bitmapMemorySize = bitmapWidth * bitmapHeight * bytesPerPixel;
+	// What is a MemoryPage?
+
+	pBitmapMemory = VirtualAlloc(0, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+
+	FillBitmapMemory(0, 0);
 }
 
-static void UpdateWindow(HDC deviceContext, int x, int y, int width, int height) {
+static void UpdateWindow(HDC deviceContext, RECT* windowRect, int x_coordinate, int y_coordinate, int width, int height) {
+	int windowWidth = windowRect->right - windowRect->left;
+	int windowHeight = windowRect->bottom - windowRect->top;
 	StretchDIBits(deviceContext,
+		/*
 						x, y, width, height, // destination
 						x, y, width, height, // source
+						*/
+		0,0,bitmapWidth, bitmapHeight,
+		0,0,windowWidth, windowHeight,
 						pBitmapMemory,
 						pBitmapInfo,
 						DIB_RGB_COLORS,
@@ -105,18 +185,26 @@ LRESULT MainWindowCallback(HWND window,
 
 			HDC deviceContext = BeginPaint(window, pPaintStruct);
 			
+			int x = paintStruct.rcPaint.left;
+			int y = paintStruct.rcPaint.top;
 			int width = paintStruct.rcPaint.right - paintStruct.rcPaint.left;
 			int height = paintStruct.rcPaint.bottom - paintStruct.rcPaint.top;
 
-			static DWORD rasterOperation = BLACKNESS; // What is a rater operation ?
-			rasterOperation = rasterOperation == WHITENESS ? BLACKNESS : WHITENESS;
+			//static DWORD rasterOperation = BLACKNESS; // What is a rater operation ?
+			//rasterOperation = rasterOperation == WHITENESS ? BLACKNESS : WHITENESS;
 
-			PatBlt(deviceContext,
-				paintStruct.rcPaint.left,
-				paintStruct.rcPaint.top,
-				width,
-				height,
-				rasterOperation);
+			//PatBlt(deviceContext,
+			//	paintStruct.rcPaint.left,
+			//	paintStruct.rcPaint.top,
+			//	width,
+			//	height,
+			//	rasterOperation);
+
+			RECT clientRect;
+			RECT* pClientRect = &clientRect;
+			GetClientRect(window, pClientRect);
+
+			UpdateWindow(deviceContext, pClientRect, x, y, width, height);
 
 			EndPaint(window, pPaintStruct);
 
@@ -174,10 +262,49 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 			// Need to start a message queue that Windows pushes messages to for our window
 			// which we then need to pull.
 			Running = true;
+			int xOffset = 0;
+			int yOffset = 0;
+
 			while (Running)
 			{
 				MSG message;
 				MSG* pMessage = &message;
+
+				while (PeekMessageA(pMessage, 0, 0, 0, PM_REMOVE)) {
+
+					if (pMessage->message == WM_QUIT) {
+						Running = false;
+					}
+
+					TranslateMessage(pMessage); // If this is commented out we cant resize the window or capture window Close events.
+					DispatchMessageW(pMessage); // If this is commented out we still see callback procedure getting invoked.
+				}
+
+				FillBitmapMemory(xOffset, yOffset);
+				xOffset++;
+				yOffset++;
+
+				PAINTSTRUCT paintStruct;
+				LPPAINTSTRUCT pPaintStruct = &paintStruct;
+
+				RECT clientRect;
+				RECT* pClientRect = &clientRect;
+				GetClientRect(windowHandle, pClientRect);
+
+				//HDC deviceContext = BeginPaint(windowHandle, pPaintStruct);
+				HDC deviceContext = GetDC(windowHandle);
+				UpdateWindow(deviceContext,
+							pClientRect,					
+							clientRect.left,
+							clientRect.top,
+							clientRect.right - clientRect.left,
+							clientRect.bottom - clientRect.top);
+
+				ReleaseDC(windowHandle, deviceContext);
+
+				/*
+				
+				// GetMessage is blocking. Use PeekMessage to get thread back to do something.
 				BOOL messageResult = GetMessage(pMessage,
 												0,
 												0,
@@ -190,6 +317,7 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 					// PostQuitMessage(0) posted a 0 message to the queue which we can handle by toggling the Running flag.
 					Running = false;
 				}
+				*/
 			}
 		}
 		else {
