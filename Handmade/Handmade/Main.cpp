@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <stdint.h>
+#include <Xinput.h>
 #include <string>
 #include "Constants.h"
 
@@ -12,6 +13,32 @@ static int bitmapWidth;
 static int bitmapHeight;
 
 static int bytesPerPixel = 4;
+
+typedef DWORD WINAPI HandmadeXInputGetState
+(
+	_In_  DWORD         dwUserIndex,  // Index of the gamer associated with the device
+	_Out_ XINPUT_STATE* pState        // Receives the current state
+);
+
+DWORD WINAPI HandmadeXInputGetStateStub(DWORD dwUserIndex, XINPUT_STATE* pState) {
+	return 0;
+}
+static HandmadeXInputGetState* HandmadeXInputGetState_ = HandmadeXInputGetStateStub;
+#define XInputGetState HandmadeXInputGetState_
+
+
+typedef DWORD WINAPI HandmadeXInputSetState
+(
+	_In_ DWORD             dwUserIndex,  // Index of the gamer associated with the device
+	_In_ XINPUT_VIBRATION* pVibration    // The vibration information to send to the controller
+);
+
+DWORD WINAPI HandmadeXInputSetStateStub(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration) {
+	return 0;
+}
+static HandmadeXInputSetState* HandmadeXInputSetState_ = HandmadeXInputSetStateStub;
+#define XInputSetState HandmadeXInputSetState_
+
 
 static void FillBitmapMemory(int xOffset, int yOffset) {
 
@@ -27,7 +54,7 @@ static void FillBitmapMemory(int xOffset, int yOffset) {
 
 			/* Little Endian Architecture :
 			0x 00 00 00 00
-			0x 00 GG BB RR
+			0x 00 BB GG RR
 
 			Windows devs made it so that they can visualise RGB when they looked into the Registers:
 			0x 00 00 00 00
@@ -40,8 +67,8 @@ static void FillBitmapMemory(int xOffset, int yOffset) {
 			++pixel;
 
 			/*
-			Loading In Memory:		BB GG RR xx
-			Loading In Register:	xx RR GG BB				Because Little Endian Architecture.
+			Loading In Memory:		BB GG RR xx			Because Little Endian Architecture.
+			Loading In Register:	xx RR GG BB
 			*/
 
 			/*
@@ -279,6 +306,41 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 					TranslateMessage(pMessage); // If this is commented out we cant resize the window or capture window Close events.
 					DispatchMessageW(pMessage); // If this is commented out we still see callback procedure getting invoked.
 				}
+
+#pragma region User Input
+
+				for (int controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; controllerIndex++) {
+					XINPUT_STATE controllerState;
+					XINPUT_STATE* pControllerState = &controllerState;
+					DWORD stateResult = XInputGetState(controllerIndex, pControllerState);
+					if (stateResult == ERROR_SUCCESS) {
+						XINPUT_GAMEPAD* pad = &pControllerState->Gamepad;
+
+						bool up = pad->wButtons & XINPUT_GAMEPAD_DPAD_UP;
+						bool down = pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN;
+						bool left = pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
+						bool right = pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
+						bool start = pad->wButtons & XINPUT_GAMEPAD_START;
+						bool back = pad->wButtons & XINPUT_GAMEPAD_BACK;
+						bool leftShoulder = pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER;
+						bool rightShoulder = pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER;
+						bool AButton = pad->wButtons & XINPUT_GAMEPAD_A;
+						bool BButton = pad->wButtons & XINPUT_GAMEPAD_B;
+						bool XButton = pad->wButtons & XINPUT_GAMEPAD_X;
+						bool YButton = pad->wButtons & XINPUT_GAMEPAD_Y;
+
+						int16_t stickX = pad->sThumbLX;
+						int16_t stickY = pad->sThumbLY;
+
+
+					}
+					else {
+						// handle when not connected
+					}
+				}
+
+#pragma endregion
+
 
 				FillBitmapMemory(xOffset, yOffset);
 				xOffset++;
