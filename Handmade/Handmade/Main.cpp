@@ -250,6 +250,32 @@ LRESULT MainWindowCallback(HWND window,
 			break;
 		}
 
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		case WM_SYSKEYDOWN:
+		case WM_SYSKEYUP:
+		{
+			uint32_t k = wParam;
+			int64_t bitToCompareAgainst = 1;
+			bool wasDown = (lParam & bitToCompareAgainst << 30) != 0;
+			bool isDown = (lParam & bitToCompareAgainst << 31) == 0;
+
+			if (k == 'W') {
+				if (wasDown) {
+					OutputDebugStringA("wasDown");
+				}
+			}
+			else if (k == 'A') {
+
+			}
+			else if (k == 'S') {	// S
+
+			}
+			else if (k == 'D') {	// D
+
+			}
+		}
+
 		default: {
 			OutputDebugStringA(("Event: " + std::to_string(message) + "\n").c_str());
 
@@ -306,6 +332,9 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 			int xOffset = 0;
 			int yOffset = 0;
 
+			bool AWasPressed = false;
+			bool AUnpressed = false;
+
 			while (Running)
 			{
 				MSG message;
@@ -346,8 +375,25 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 						int16_t stickX = pad->sThumbLX;
 						int16_t stickY = pad->sThumbLY;
 
+						XINPUT_VIBRATION vibration;
+						XINPUT_VIBRATION* pVibration = &vibration;
+
 						if (AButton) {
+							AWasPressed = true;
+							AUnpressed = false;
+
 							yOffset++;
+							vibration.wLeftMotorSpeed = 65000;
+							vibration.wRightMotorSpeed = 65000;
+							XInputSetState(controllerIndex, pVibration);
+						}
+						else if (AWasPressed && !AButton) {
+							AWasPressed = false;
+							AUnpressed = true;
+							vibration.wLeftMotorSpeed = 0;
+							vibration.wRightMotorSpeed = 0;
+
+							XInputSetState(controllerIndex, pVibration);
 						}
 					}
 					else {
