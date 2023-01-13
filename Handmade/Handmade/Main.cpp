@@ -14,6 +14,8 @@ static int bitmapHeight;
 
 static int bytesPerPixel = 4;
 
+#pragma region XINPUT Load
+
 typedef DWORD WINAPI HandmadeXInputGetState
 (
 	_In_  DWORD         dwUserIndex,  // Index of the gamer associated with the device
@@ -25,7 +27,6 @@ DWORD WINAPI HandmadeXInputGetStateStub(DWORD dwUserIndex, XINPUT_STATE* pState)
 }
 static HandmadeXInputGetState* HandmadeXInputGetState_ = HandmadeXInputGetStateStub;
 #define XInputGetState HandmadeXInputGetState_
-
 
 typedef DWORD WINAPI HandmadeXInputSetState
 (
@@ -39,6 +40,17 @@ DWORD WINAPI HandmadeXInputSetStateStub(DWORD dwUserIndex, XINPUT_VIBRATION* pVi
 static HandmadeXInputSetState* HandmadeXInputSetState_ = HandmadeXInputSetStateStub;
 #define XInputSetState HandmadeXInputSetState_
 
+static void LoadXInput() {
+	const wchar_t* a = L"xinput1_4.dll";
+	HMODULE xinputLibraryHandle = LoadLibrary(a);
+
+	if (xinputLibraryHandle) {
+		HandmadeXInputGetState_ = (HandmadeXInputGetState*)GetProcAddress(xinputLibraryHandle, "XInputGetState");
+		HandmadeXInputSetState_ = (HandmadeXInputSetState*)GetProcAddress(xinputLibraryHandle, "XInputSetState");
+	}
+}
+
+#pragma endregion
 
 static void FillBitmapMemory(int xOffset, int yOffset) {
 
@@ -252,6 +264,8 @@ LRESULT MainWindowCallback(HWND window,
 
 int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int showCode)
 {
+	LoadXInput();
+
 	// Open a simple message box.
 	/*MessageBoxA(0, "This is a message box.", "Handmade Hero", MB_OK | MB_ICONINFORMATION);*/
 
@@ -332,7 +346,9 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 						int16_t stickX = pad->sThumbLX;
 						int16_t stickY = pad->sThumbLY;
 
-
+						if (AButton) {
+							yOffset++;
+						}
 					}
 					else {
 						// handle when not connected
@@ -344,7 +360,6 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 
 				FillBitmapMemory(xOffset, yOffset);
 				xOffset++;
-				yOffset++;
 
 				PAINTSTRUCT paintStruct;
 				LPPAINTSTRUCT pPaintStruct = &paintStruct;
