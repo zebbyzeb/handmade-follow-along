@@ -23,7 +23,7 @@ typedef DWORD WINAPI HandmadeXInputGetState
 );
 
 DWORD WINAPI HandmadeXInputGetStateStub(DWORD dwUserIndex, XINPUT_STATE* pState) {
-	return 0;
+	return ERROR_DEVICE_NOT_CONNECTED;
 }
 static HandmadeXInputGetState* HandmadeXInputGetState_ = HandmadeXInputGetStateStub;
 #define XInputGetState HandmadeXInputGetState_
@@ -35,7 +35,7 @@ typedef DWORD WINAPI HandmadeXInputSetState
 );
 
 DWORD WINAPI HandmadeXInputSetStateStub(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration) {
-	return 0;
+	return ERROR_DEVICE_NOT_CONNECTED;
 }
 static HandmadeXInputSetState* HandmadeXInputSetState_ = HandmadeXInputSetStateStub;
 #define XInputSetState HandmadeXInputSetState_
@@ -274,6 +274,8 @@ LRESULT MainWindowCallback(HWND window,
 			else if (k == 'D') {	// D
 
 			}
+
+			// TODO: Handle Alt+F4 close.
 		}
 
 		default: {
@@ -371,7 +373,7 @@ int WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int s
 						bool BButton = pad->wButtons & XINPUT_GAMEPAD_B;
 						bool XButton = pad->wButtons & XINPUT_GAMEPAD_X;
 						bool YButton = pad->wButtons & XINPUT_GAMEPAD_Y;
-
+						
 						int16_t stickX = pad->sThumbLX;
 						int16_t stickY = pad->sThumbLY;
 
